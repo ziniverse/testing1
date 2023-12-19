@@ -622,43 +622,167 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 });
+document.querySelector('.search-input').addEventListener('input', performLiveSearch);
 document.querySelector('.search-input').addEventListener('keypress', function (e) {
     if (e.key === 'Enter') {
-        performSearch();
+        performFullSearch();
     }
 });
+const movieApiUrls = {
+    'movie-1': 'https://www.omdbapi.com/?i=tt1517268&apikey=cafc3dc5',
+    'movie-2': 'https://www.omdbapi.com/?i=tt15398776&apikey=cafc3dc5',
+    'movie-3': 'https://www.omdbapi.com/?i=tt9362722&apikey=cafc3dc5',
+    'movie-4': 'https://www.omdbapi.com/?i=tt15789038&apikey=cafc3dc5',
+    'movie-5': 'https://www.omdbapi.com/?i=tt14362112&apikey=cafc3dc5',
+    'movie-6': 'https://www.omdbapi.com/?i=tt10545296&apikey=cafc3dc5',
+    'movie-7': 'https://www.omdbapi.com/?i=tt6587046&apikey=cafc3dc5',
+    // Add more movies here
+    'upcoming-movie-1': 'https://www.omdbapi.com/?i=tt1695843&apikey=cafc3dc5',
+    'upcoming-movie-2': 'https://www.omdbapi.com/?i=tt6166392&apikey=cafc3dc5',
+    'upcoming-movie-3': 'https://www.omdbapi.com/?i=tt15239678&apikey=cafc3dc5',
+    'upcoming-movie-4': 'https://www.omdbapi.com/?i=tt9663764&apikey=cafc3dc5',
+    'upcoming-movie-5': 'https://www.omdbapi.com/?i=tt11304740&apikey=cafc3dc5',
+    'upcoming-movie-6': 'https://www.omdbapi.com/?i=tt11762114&apikey=cafc3dc5'
+    // Add more upcoming movies here
+};
+let searchDebounceTimeout;
+function performLiveSearch() {
+    clearTimeout(searchDebounceTimeout);
+    searchDebounceTimeout = setTimeout(() => {
+        const searchText = document.querySelector('.search-input').value.toLowerCase();
+        let foundMovies = [];
 
-function performSearch() {
-    const searchText = document.querySelector('.search-input').value.toLowerCase();
-    const currentMovies = document.querySelectorAll('.movie');
-    const upcomingMovies = document.querySelectorAll('.upcoming-movie');
-    let foundMovies = [];
-
-    // Search in current movies
-    currentMovies.forEach(movie => {
-        const title = movie.querySelector('h5').textContent.toLowerCase();
-        if (title.includes(searchText)) {
-            foundMovies.push({element: movie.cloneNode(true), type: 'current'});
+        if (searchText) {
+            Object.keys(movieApiUrls).forEach(movieKey => {
+                fetchMovieData(movieKey, searchText, foundMovies, () => {
+                    displayLiveSearchResults(foundMovies);
+                });
+            });
+        } else {
+            document.getElementById('live-search-results').innerHTML = ''; // Clear live search results
         }
-    });
-
-    // Search in upcoming movies
-    upcomingMovies.forEach(movie => {
-        const title = movie.textContent.toLowerCase();
-        if (title.includes(searchText)) {
-            foundMovies.push({element: movie.cloneNode(true), type: 'upcoming'});
-        }
-    });
-
-    displaySearchResults(foundMovies);
+    }, 300); // Debounce for 300 ms
 }
 
+function performFullSearch() {
+    const searchText = document.querySelector('.search-input').value.toLowerCase();
+    let foundMovies = [];
+
+    Object.keys(movieApiUrls).forEach((movieKey, index, array) => {
+        fetchMovieData(movieKey, searchText, foundMovies, () => {
+            if (index === array.length - 1) {
+                displaySearchResults(foundMovies);
+            }
+        });
+    });
+}
+
+function fetchMovieData(movieKey, searchText, foundMovies, callback) {
+    const apiUrl = movieApiUrls[movieKey];
+    if (!apiUrl) {
+        console.error('API URL not found for movie:', movieKey);
+        callback();
+        return;
+    }
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            if ((data.Title && data.Title.toLowerCase().includes(searchText)) ||
+                (data.Genre && data.Genre.toLowerCase().includes(searchText))) {
+                const movieElement = createMovieElement(data, movieKey);
+                foundMovies.push({ element: movieElement, type: data.Type });
+            }
+            callback();
+        })
+        .catch(error => {
+            console.error('Error fetching movie data:', error);
+            callback();
+        });
+}
+
+function createMovieElement(movieData, movieKey, isLiveSearch = false) {
+    const movieElement = document.createElement('div');
+    movieElement.className = 'movie-box';
+    movieElement.style.display = 'flex';
+    movieElement.style.alignItems = 'flex-start'; // Align items to the start
+    movieElement.style.marginBottom = '10px';
+
+    const imageElement = document.createElement('img');
+    imageElement.src = movieData.Poster;
+    imageElement.alt = movieData.Title;
+    imageElement.style.width = '30px'; // Adjust based on context
+    imageElement.style.height = '50px';
+    imageElement.style.marginRight = '10px';
+    movieElement.appendChild(imageElement);
+
+    const textContainer = document.createElement('div'); // Container for text details
+    textContainer.style.flexGrow = '1'; // Allow it to fill the space
+
+    const titleElement = document.createElement('h5');
+    titleElement.textContent = movieData.Title;
+    titleElement.className = 'movie-title';
+    titleElement.style.fontSize = isLiveSearch ? '12px' : '18px'; // Adjust font size based on context
+    textContainer.appendChild(titleElement);
+
+    const releaseElement = document.createElement('h5');
+    releaseElement.textContent = movieData.Year;
+    releaseElement.className = 'movie-year';
+    releaseElement.style.fontSize = '10px';
+    textContainer.appendChild(releaseElement);
+
+    const genreElement = document.createElement('h5');
+    genreElement.textContent = movieData.Genre;
+    genreElement.className = 'movie-genre';
+    genreElement.style.fontSize = '10px';
+    textContainer.appendChild(genreElement);
+
+    const ageratingElement = document.createElement('h5');
+    ageratingElement.textContent = movieData.Rated;
+    ageratingElement.className = 'movie-rating';
+    ageratingElement.style.fontSize = '10px';
+    textContainer.appendChild(ageratingElement);
+
+    movieElement.appendChild(textContainer); // Add the text container to the movie element
+
+    movieElement.onclick = () => {
+        openModal(`modal-${movieKey}`); // Use movieKey to form the modal ID
+    };
+
+    return movieElement;
+}
+
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'block';
+    } else {
+        console.error("Modal not found:", modalId);
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+function displayLiveSearchResults(foundMovies) {
+    const liveSearchContainer = document.getElementById('live-search-results');
+    liveSearchContainer.innerHTML = '';
+
+    foundMovies.forEach(({ element }) => {
+        const clonedElement = element.cloneNode(true);
+        clonedElement.onclick = element.onclick; // Copy the onclick event
+        liveSearchContainer.appendChild(clonedElement);
+    });
+}
 function displaySearchResults(foundMovies) {
     const searchModalContainer = document.getElementById('search-modal-container');
     searchModalContainer.innerHTML = `
-        <div class="full-screen-modal show">
+    <div class="full-screen-modal show" style="width: 100vw; position: absolute; top: 0; left: 0;">
             <span class="close-button">&times;</span>
-            <div class="search-modal-content" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;"></div>
+            <div class="search-modal-content" style="display: grid; grid-template-columns: 1fr;"></div>
         </div>`;
 
     const searchModalContent = searchModalContainer.querySelector('.search-modal-content');
@@ -666,24 +790,47 @@ function displaySearchResults(foundMovies) {
     if (foundMovies.length === 0) {
         searchModalContent.innerHTML = 'No search found';
     } else {
-        foundMovies.forEach(({element, type}) => {
-            element.addEventListener('click', function() {
-                const movieId = type === 'current' ? element.id.replace('movie-', 'modal-movie-') : element.id.replace('upcoming-movie-', 'modal-upcoming-movie-');
-                openMovieModal(movieId);
-            });
-            // Set image size based on movie type
+        foundMovies.forEach(({ element, type }) => {
+            // Style for movie box
+            element.classList.add('movie-box');
+            element.style.height = 'auto';
+            element.style.display = 'flex';
+            element.style.height = '170px';
+            element.style.backgroundColor = '#232323';
+            element.style.borderRadius = '20px';
+            element.style.alignItems = 'center';
+            element.style.marginBottom = '10px'; // Adds space between the boxes
+            
+
+    // Responsive width
+    if (window.innerWidth < 768) { // Adjust breakpoint as needed
+        element.style.width = '100%'; // Full width for smaller screens
+    } else {
+        element.style.width = '1450px'; 
+    }
+    
+            // Style for the image
             const img = element.querySelector('img');
             if (img) {
-                if (type === 'current') {
-                    img.style.width = '112px';
-                    img.style.height = '169px';
-                } else if (type === 'upcoming') {
-                    img.style.width = '70px';
-                    img.style.height = '97px';
-                }
+                img.style.width = '114px';
+                img.style.height = '171px';
+                img.style.marginRight = '30px';
+                img.style.objectFit = 'contain';
             }
+            const title = element.querySelector('.movie-title');
+            if (title) {
+                title.style.fontSize = '24px';
+            }
+            // Add the modified element to the modal content
             searchModalContent.appendChild(element);
         });
+        const totalHeight = searchModalContent.scrollHeight;
+    if (totalHeight < window.innerHeight * 0.9) {
+        searchModalContainer.style.height = totalHeight + 'px';
+    } else {
+        searchModalContainer.style.height = '90vh';
+    }
+
     }
 
     // Close button functionality
@@ -691,7 +838,8 @@ function displaySearchResults(foundMovies) {
     closeButton.onclick = () => {
         searchModalContainer.innerHTML = '';
     };
-}
+} 
+
 function openMovieModal(movieModalId) {
     const modal = document.getElementById(movieModalId);
     if (modal) {
@@ -875,6 +1023,15 @@ function updateMovieInfo(movieId, apiUrl) {
             } else {
                 console.error('Upcoming movie button image not found');
             }
+        const releaseDateElement = movieDiv.querySelector('.release-date');
+            const ageRatingElement = movieDiv.querySelector('.age-rating');
+            const genreElement = movieDiv.querySelector('.genre');
+
+            if (releaseDateElement && ageRatingElement && genreElement) {
+                releaseDateElement.textContent = 'Release Date: ' + data.Released;
+                ageRatingElement.textContent = 'Age Rating: ' + data.Rated;
+                genreElement.textContent = 'Genre: ' + data.Genre;
+            }
         })
         .catch(error => {
             console.error('Error fetching movie data:', error);
@@ -1012,4 +1169,3 @@ document.querySelectorAll('.modal').forEach(function(modal, index) {
         }
     });
 });
-
