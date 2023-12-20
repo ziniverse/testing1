@@ -260,7 +260,6 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         return seatStates;
     }
-
     function determineHallNumber(buttonText) {
         // Create a hash from the button text to determine the hall number
         let hash = 0;
